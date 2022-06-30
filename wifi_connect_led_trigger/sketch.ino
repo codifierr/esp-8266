@@ -1,5 +1,5 @@
 /*
-  ESP8266 mDNS responder sample
+  ESP8266 mDNS responder sample with LED trigger
 
   This is an example of an HTTP server that is accessible
   via http://esp8266.local URL thanks to mDNS responder.
@@ -115,7 +115,7 @@ void loop(void)
     client.flush();
 
     String s;
-    if (req == "/hello")
+    if (req == "/hello/")
     {
         IPAddress ip = WiFi.localIP();
         String ipStr = String(ip[0]) + '.' + String(ip[1]) + '.' + String(ip[2]) + '.' + String(ip[3]);
@@ -123,18 +123,18 @@ void loop(void)
         s += ipStr;
         s += "</html>\r\n\r\n";
         Serial.println("Sending 200");
-    } else if (req == "/D7/on"){
+    } else if (req == "/D7/on/"){
         digitalWrite(ledPin, HIGH);
         s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>D7 ON</html>\r\n\r\n";
         Serial.println("Sending 200");
-    } else if (req == "/D7/off"){
+    } else if (req == "/D7/off/"){
         digitalWrite(ledPin, LOW);
         s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>D7 OFF</html>\r\n\r\n";
         Serial.println("Sending 200");
-    } else if (req == "/D8/on"){
+    } else if (req == "/D8/on/"){
         s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>D8 ON</html>\r\n\r\n";
         Serial.println("Sending 200");
-    } else if (req == "/D8/off"){
+    } else if (req == "/D8/off/"){
         s = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>D8 OFF</html>\r\n\r\n";
         Serial.println("Sending 200");
     }
