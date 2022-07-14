@@ -5,8 +5,10 @@
 // The dry run protection timeout is set to 90 minutes
 
 // The scheduling logic will be implemented in the future which will be based on the time of day using the NTP clock.
-// Support for push notification will be implemented in the future. With pump and water level status.
+// Support for push notification(wifi) will be implemented in the future. With pump and water level status.
 // Author : Satyendra Singh
+
+// wire colour codes , Red = VCC , Black = GND , White = Trigger , Green = Echo
 
 #define echoPin D5  // attach pin D5 ESP8266 to pin Echo of HC-SR04
 #define trigPin D6  // attach pin D6 ESP8266 to pin Trig of HC-SR04
@@ -60,12 +62,15 @@ void setup()
 
 void loop()
 {
-    delay(1000);
+    // blink led to indicate the start of the loop
     digitalWrite(pulsePin, HIGH); // set the pulse pin to HIGH
     waterLevelController(); // call the function to control the water level
-    // Get status every two seconds
-    delay(1000); // delay for 2 seconds
+    // Get status every one seconds
+    delay(1000); // delay for 1 second
+    // stop led to indicate the end of the loop
     digitalWrite(pulsePin, LOW); // set the pulse pin to LOW
+    // delay for a 1 second to keep led off
+    delay(1000);
 }
 
 void setUpWaterLevelController()
