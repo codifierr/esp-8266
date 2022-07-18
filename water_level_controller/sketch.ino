@@ -29,8 +29,8 @@ int dry_run_wait_interval = 2700; // variable for the dry run wait interval valu
 
 // define constants
 const int max_range = 300; // constant for the maximum range of the sensor
-const float speed_of_sound = 0.034; // constant for the speed of sound
-const int water_stop_distance = 15; // constant for the water stop distance
+const float speed_of_sound = 0.0343; // constant for the speed of sound in cm/s
+const int water_stop_distance = 25; // constant for the water stop distance
 const int tank_height = 140; // constant for the tank height
 const int water_level_low = 100; // constant for the water level low
 
@@ -134,7 +134,7 @@ long getDistance()
     digitalWrite(trigPin, LOW); // Sets the trigPin to LOW
     delayMicroseconds(2); // waits 2 micro seconds
     digitalWrite(trigPin, HIGH); // Sets the trigPin to HIGH
-    delayMicroseconds(10); // waits 10 micro seconds
+    delayMicroseconds(20); // waits 10 micro seconds
     digitalWrite(trigPin, LOW); // Sets the trigPin to LOW
     long duration = pulseIn(echoPin, HIGH); // Reads the echoPin, returns the sound wave travel in microseconds
     int distance = duration * speed_of_sound; // Calculating the distance
