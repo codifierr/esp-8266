@@ -1,24 +1,40 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#define wifiLed D0     // attach pin D0 ESP8266 to pin Wifi indication
-#define mqttLed D1     // attach pin D1 to the led for mqtt status
-#define pulsePin D3    // attach pin D3 ESP8266 to pin Pulse indication
-#define pumpStopPin D4 // attach pin D9 ESP8266 to pin Pump Stop indication
-#define echoPin D5     // attach pin D5 ESP8266 to pin Echo of HC-SR04
-#define trigPin D6     // attach pin D6 ESP8266 to pin Trig of HC-SR04
-#define relayPin D7    // attach pin D7 ESP8266 to pin Relay
-#define dryRunPin D8   // attach pin D8 ESP8266 to pin Dry Run indication
+// libs for oled display 128x32
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+// display properties
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+
+#define OLED_RESET -1       // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// pin definitions
+
+// #define wifiLed D0     // attach pin D0 ESP8266 to pin Wifi indication
+// #define mqttLed D1     // attach pin D1 to the led for mqtt status
+#define pulsePin D8 // attach pin D8 ESP8266 to pin Pulse indication
+// #define pumpStopPin D4 // attach pin D9 ESP8266 to pin Pump Stop indication
+#define echoPin D5  // attach pin D5 ESP8266 to pin Echo of HC-SR04
+#define trigPin D6  // attach pin D6 ESP8266 to pin Trig of HC-SR04
+#define relayPin D7 // attach pin D7 ESP8266 to pin Relay
+// #define dryRunPin D8   // attach pin D8 ESP8266 to pin Dry Run indication
 
 // define variables
 bool pump_running = false;        // variable for the pump status
 bool pump_switch = false;         // variable for the pump switch status
 int pump_start_level = 0;         // variable for the pump start level
-int dry_run_check_interval = 360; // variable for the dry run check interval value 180 for 360 seconds = 6 minutes
+int dry_run_check_interval = 360; // variable for the dry run check interval value of 360 seconds = 6 minutes
 int dry_run_check_counter = 0;    // variable for the dry run counter
 bool dry_run_wait = false;        // variable for the dry run flag
 int dry_run_wait_counter = 0;     // variable for the dry run wait counter
-int dry_run_wait_interval = 5400; // variable for the dry run wait interval value 2700 for 5400 seconds = 90 minutes
+int dry_run_wait_interval = 5400; // variable for the dry run wait interval value of 5400 seconds = 90 minutes
 
 // define constants
 const int max_range = 450;           // constant for the maximum range of the sensor
@@ -28,16 +44,16 @@ const int tank_height = 140;         // constant for the tank height
 const int water_level_low = 100;     // constant for the water level low
 
 // WiFi Status LED
-#define wifiLed D0 // D0
+// #define wifiLed D0 // D0
 
 // Update these with values suitable for your network.
 
-const char *ssid = "ssid";   // WiFI Name
-const char *password = "password"; // WiFi Password
-const char *mqttServer = "server-ip"; // MQTT Server Address
+const char *ssid = "ssid";                  // WiFI Name
+const char *password = "password";          // WiFi Password
+const char *mqttServer = "server-ip";       // MQTT Server Address
 const char *clientID = "EspPumpController"; // client id
-const char *topicR = "pump.cont.r";         // topic for receiving commands
-const char *topicP = "pump.cont.p";         // topic for sending data
+const char *topicR = "pump/cont/r";         // topic for receiving commands
+const char *topicP = "pump/cont/p";         // topic for sending data
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -49,15 +65,28 @@ int value = 0;
 
 void setup()
 {
-    pinMode(trigPin, OUTPUT);     // Sets the trigPin as an OUTPUT
-    pinMode(echoPin, INPUT);      // Sets the echoPin as an INPUT
-    pinMode(relayPin, OUTPUT);    // Sets the relayPin as an OUTPUT
-    pinMode(dryRunPin, OUTPUT);   // Sets the dryRunPin as an OUTPUT
-    pinMode(pumpStopPin, OUTPUT); // Sets the pumpStopPin as an OUTPUT
-    pinMode(pulsePin, OUTPUT);    // Sets the pulsePin as an OUTPUT
-    pinMode(wifiLed, OUTPUT);     // Sets the wifiLed as an OUTPUT
-    pinMode(mqttLed, OUTPUT);
-    Serial.begin(115200);                                  // Serial Communication is starting with 9600 of baudrate speed
+    pinMode(trigPin, OUTPUT);  // Sets the trigPin as an OUTPUT
+    pinMode(echoPin, INPUT);   // Sets the echoPin as an INPUT
+    pinMode(relayPin, OUTPUT); // Sets the relayPin as an OUTPUT
+    // pinMode(dryRunPin, OUTPUT);   // Sets the dryRunPin as an OUTPUT
+    // pinMode(pumpStopPin, OUTPUT); // Sets the pumpStopPin as an OUTPUT
+    pinMode(pulsePin, OUTPUT); // Sets the pulsePin as an OUTPUT
+    // pinMode(wifiLed, OUTPUT);     // Sets the wifiLed as an OUTPUT
+    // pinMode(mqttLed, OUTPUT);
+    Serial.begin(115200); // Serial Communication is starting with 9600 of baudrate speed
+
+    // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+    if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS))
+    {
+        Serial.println(F("SSD1306 allocation failed"));
+        for (;;)
+            ; // Don't proceed, loop forever
+    }
+
+    // Clear display buffer
+    display.clearDisplay();
+    display.display();
+
     Serial.println(" Ultrasonic Sensor HC-SR04");          // print some text in Serial Monitor
     Serial.println(" with ESP8266 and mqtt PubSubClient"); // print some text in Serial Monitor
     // intial delay of 5 seconds before starting pump
@@ -74,8 +103,11 @@ void setup()
     setUpWaterLevelController(); // call the function to set up the water level controller
 
     // During Starting WiFi LED should TURN OFF
-    digitalWrite(wifiLed, LOW);
-    digitalWrite(mqttLed, LOW);
+    // digitalWrite(wifiLed, LOW);
+    displayWifiStatus(0);
+
+    // digitalWrite(mqttLed, LOW);
+    displayMqttStatus(0);
 
     setup_wifi();
     client.setServer(mqttServer, 30426);
@@ -87,16 +119,27 @@ void loop()
     // blink led to indicate the start of the loop
     digitalWrite(pulsePin, HIGH); // set the pulse pin to HIGH
 
-    if (!client.connected())
+    if (WiFi.status() != WL_CONNECTED)
     {
-        digitalWrite(wifiLed, LOW);
-        reconnect();
+        // WiFi is not connected
+        // digitalWrite(wifiLed, LOW);
+        displayWifiStatus(0);
+        // reconnect wifi
+        reconnectWifi();
     }
     else
     {
-        digitalWrite(wifiLed, HIGH);
+        // WiFi is connected
+        // digitalWrite(wifiLed, HIGH);
+        displayWifiStatus(1);
+
+        // mqtt conditional reconnection
+        if (!client.connected())
+        {
+            reconnectMqtt();
+        }
+        client.loop();
     }
-    client.loop();
 
     waterLevelController(); // call the function to control the water level
     // Get status every one seconds
@@ -120,22 +163,43 @@ void setup_wifi()
     Serial.println("WiFi connected");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
+    displayWifiStatus(1);
 }
 
-void reconnect()
+void reconnectWifi()
+{
+    Serial.println("WiFi disconnected. reconnecting...");
+    delay(10);
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(500);
+        Serial.print(".");
+        displayWifiStatus(2);
+    }
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+    displayWifiStatus(1);
+}
+
+void reconnectMqtt()
 {
     while (!client.connected())
     {
         if (client.connect(clientID))
         {
             Serial.println("MQTT connected");
-            digitalWrite(mqttLed, HIGH);
+            displayMqttStatus(1);
+            // digitalWrite(mqttLed, HIGH);
             // ... and resubscribe
             client.subscribe(topicR);
         }
         else
         {
-            digitalWrite(mqttLed, LOW);
+            // digitalWrite(mqttLed, LOW);
+            displayMqttStatus(2);
             Serial.print("failed, rc=");
             Serial.print(client.state());
             Serial.println(" try again in 5 seconds");
@@ -190,28 +254,31 @@ void startPump(int level)
     Serial.println(" Starting Pump");
     delay(2000); // delay for 2 seconds
     digitalWrite(relayPin, HIGH);
-    digitalWrite(dryRunPin, LOW);   // turn off dry run pin
-    digitalWrite(pumpStopPin, LOW); // turn off pump stop pin
+    // digitalWrite(dryRunPin, LOW);   // turn off dry run pin
+    // digitalWrite(pumpStopPin, LOW); // turn off pump stop pin
     pump_running = true;
     dry_run_check_counter = dry_run_check_interval;
     pump_start_level = level;
     pump_switch = true;
     Serial.println(" Pump Started");
+    displayPumpStatus(1);
+    displayWaterLevel(level);
 }
 
 void stopPump()
 {
     Serial.println(" Stopping Pump");
-    delay(2000);                     // delay for 2 seconds
-    digitalWrite(pumpStopPin, HIGH); // turn on pump stop pin
+    delay(2000); // delay for 2 seconds
+    // digitalWrite(pumpStopPin, HIGH); // turn on pump stop pin
     digitalWrite(relayPin, LOW);
-    digitalWrite(dryRunPin, LOW); // turn off dry run pin
+    // digitalWrite(dryRunPin, LOW); // turn off dry run pin
     dry_run_wait = false;
     pump_running = false;
     // reset dry run counter
     dry_run_check_counter = 0;
     pump_switch = false;
     Serial.println(" Pump Stopped");
+    displayPumpStatus(0);
 }
 
 void pausePump()
@@ -219,12 +286,13 @@ void pausePump()
     Serial.println(" Pausing Pump");
     delay(2000); // delay for 2 seconds
     digitalWrite(relayPin, LOW);
-    digitalWrite(pumpStopPin, HIGH); // turn on pump stop pin
-    digitalWrite(dryRunPin, HIGH);   // turn on dry run pin
+    // digitalWrite(pumpStopPin, HIGH); // turn on pump stop pin
+    // digitalWrite(dryRunPin, HIGH);   // turn on dry run pin
     pump_running = false;
     // reset dry run counter
     dry_run_check_counter = 0;
     Serial.println(" Pump Paused");
+    displayPumpStatus(2);
 }
 
 long getDistance()
@@ -272,10 +340,17 @@ void printPumpStatus()
     if (pump_running)
     {
         Serial.println(" Pump is running ");
+        displayPumpStatus(1);
+    }
+    else if (dry_run_wait)
+    {
+        Serial.println(" Pump is waiting for dry run ");
+        displayPumpStatus(2);
     }
     else
     {
         Serial.println(" Pump is not running ");
+        displayPumpStatus(0);
     }
 }
 
@@ -370,7 +445,7 @@ void waterLevelController()
         // water level in percentage
         int per = getWaterLevelInPercentage(level);
         Serial.print(" Water level is " + String(per) + "%");
-        // String temp = " {\"Level\": " + String(per) + "}";
+        displayWaterLevel(per);
         String temp = "{\"Level\":" + String(per) + ",\"Distance\":" + String(distance) + ",\"PumpRunning\":" + String(pump_running) + ",\"DryRunWait\":" + String(dry_run_wait) + ",\"MaxRange\":" + String(max_range) + ",\"WaterStopDistance\":" + String(water_stop_distance) + ",\"TankHeight\":" + String(tank_height) + ",\"LowWaterLevel\":" + String(water_level_low) + ",\"Unit\":\"CM\"}";
         Serial.println(temp);
         char tab2[1024];
@@ -384,8 +459,106 @@ void waterLevelController()
         }
 
         printPumpStatus();
-
-        // print the water distance in Serial Monitor
-        // Serial.print(" Distance: " + String(distance) + " cm");
     }
+}
+
+void fillRectangle(int x, int y, int width, int height, int color)
+{
+    display.fillRect(x, y, width, height, color);
+    display.display();
+}
+
+void displayWaterLevel(int level)
+{
+    int x = 0;
+    int y = 0;
+    int width = 128;
+    int height = 15;
+    fillRectangle(x, y, width, height, SSD1306_BLACK);
+    display.setCursor(1, 0);
+    display.setTextSize(2);
+    display.setTextColor(SSD1306_WHITE);
+    display.println("Level " + String(level) + "%");
+    display.display();
+}
+
+void displayWifiStatus(int status)
+{
+    int x = 0;
+    int y = 16;
+    int width = 64;
+    int height = 8;
+    fillRectangle(x, y, width, height, SSD1306_BLACK);
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(x, y);
+    if (status == 1)
+    {
+        display.println("Wifi On");
+    }
+    else if (status == 0)
+    {
+        display.println("Wifi Off");
+    }
+    else
+    {
+        display.println("Wifi Error");
+    }
+    display.display();
+}
+
+void displayMqttStatus(int status)
+{
+    delayMicroseconds(20);
+    int x = 64;
+    int y = 16;
+    int width = 64;
+    int height = 8;
+    fillRectangle(x, y, width, 8, SSD1306_BLACK);
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(x, y);
+    if (status == 1)
+    {
+        display.println("Mqtt On");
+    }
+    else if (status == 0)
+    {
+        display.println("Mqtt Off");
+    }
+    else
+    {
+        display.println("Mqtt Error");
+    }
+    display.display();
+}
+
+void displayPumpStatus(int status)
+{
+    delayMicroseconds(20);
+    int x = 0;
+    int y = 24;
+    int width = 80;
+    int height = 8;
+    fillRectangle(x, y, width, height, SSD1306_BLACK);
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(x, y);
+    if (status == 1)
+    {
+        display.println("Pump Running");
+    }
+    else if (status == 0)
+    {
+        display.println("Pump Stopped");
+    }
+    else if (status == 2)
+    {
+        display.println("Pump Paused");
+    }
+    else
+    {
+        display.println("Pump Error");
+    }
+    display.display();
 }
