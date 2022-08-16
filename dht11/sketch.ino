@@ -109,27 +109,6 @@ void reconnectWifi()
     Serial.println(WiFi.localIP());
 }
 
-void reconnect()
-{
-    while (!client.connected())
-    {
-        if (client.connect(clientID))
-        {
-            Serial.println("MQTT connected");
-            // ... and resubscribe
-            client.subscribe(topicR);
-        }
-        else
-        {
-            Serial.print("failed, rc=");
-            Serial.print(client.state());
-            Serial.println(" try again in 5 seconds");
-            // Wait 5 seconds before retrying
-            delay(5000);
-        }
-    }
-}
-
 void reconnectMqtt()
 {
     while (!client.connected())
