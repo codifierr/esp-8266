@@ -100,7 +100,7 @@ void setup()
     }
     Serial.println(" Initialization complete");
 
-    setUpWaterLevelController(); // call the function to set up the water level controller
+    // setUpWaterLevelController(); // call the function to set up the water level controller
 
     // During Starting WiFi LED should TURN OFF
     // digitalWrite(wifiLed, LOW);
@@ -214,24 +214,32 @@ void callback(char *topic, byte *payload, unsigned int length)
     Serial.print("Message arrived [");
     Serial.print(topic);
     Serial.print("] ");
+    String message;
     for (int i = 0; i < length; i++)
     {
-        Serial.print((char)payload[i]);
+        message = message + (char)payload[i];
     }
-    if ((char)payload[0] == '1')
+    Serial.print(message);
+    if (message == "TurnOn")
     {
         Serial.println("Start pump message received");
+        // client.publish(topicP, "{\"message\":\"Start pump command received\"}");
         int distance = getDistance();
         int level = getWaterLevel(distance);
         pump_start_level = getWaterLevelInPercentage(level);
         startPump(pump_start_level);
     }
-    else
+    else if (message == "TurnOff")
     {
         Serial.println("Stop pump message received");
+        // client.publish(topicP, "{\"message\":\"Stop pump message received\"}");
         stopPump();
     }
-    client.publish(topicP, "Message received");
+    else
+    {
+        Serial.println("Unknown message received");
+        // client.publish(topicP, "{\"message\":\"Unknown message received\"}");
+    }
 }
 
 void setUpWaterLevelController()
@@ -268,7 +276,7 @@ void startPump(int level)
 void stopPump()
 {
     Serial.println(" Stopping Pump");
-    delay(2000); // delay for 2 seconds
+    delay(15000); // delay for 15 seconds
     // digitalWrite(pumpStopPin, HIGH); // turn on pump stop pin
     digitalWrite(relayPin, LOW);
     // digitalWrite(dryRunPin, LOW); // turn off dry run pin
@@ -300,9 +308,9 @@ long getDistance()
     digitalWrite(trigPin, LOW);                               // Sets the trigPin to LOW
     delayMicroseconds(2);                                     // waits 2 micro seconds
     digitalWrite(trigPin, HIGH);                              // Sets the trigPin to HIGH
-    delayMicroseconds(20);                                    // waits 10 micro seconds
+    delayMicroseconds(20);                                    // waits 20 micro seconds
     digitalWrite(trigPin, LOW);                               // Sets the trigPin to LOW
-    long duration = pulseIn(echoPin, HIGH);                   // Reads the echoPin, returns the sound wave travel in microseconds
+    long duration = pulseIn(echoPin, HIGH, 26000);            // Reads the echoPin, returns the sound wave travel in microseconds
     int distance = duration * speed_of_sound;                 // Calculating the distance
     distance = distance / 2;                                  // Divide by 2 to remove the sound travel time of the echo to the distance
     Serial.println(" Distance: " + String(distance) + " cm"); // print the distance in Serial Monitor
@@ -335,22 +343,25 @@ bool isTankFull(int level)
     return false;
 }
 
-void printPumpStatus()
+String pumpStatus()
 {
     if (pump_running)
     {
         Serial.println(" Pump is running ");
         displayPumpStatus(1);
+        return "Running";
     }
     else if (dry_run_wait)
     {
         Serial.println(" Pump is waiting for dry run ");
         displayPumpStatus(2);
+        return "Paused";
     }
     else
     {
         Serial.println(" Pump is not running ");
         displayPumpStatus(0);
+        return "Stopped";
     }
 }
 
@@ -446,19 +457,19 @@ void waterLevelController()
         int per = getWaterLevelInPercentage(level);
         Serial.print(" Water level is " + String(per) + "%");
         displayWaterLevel(per);
-        String temp = "{\"Level\":" + String(per) + ",\"Distance\":" + String(distance) + ",\"PumpRunning\":" + String(pump_running) + ",\"DryRunWait\":" + String(dry_run_wait) + ",\"MaxRange\":" + String(max_range) + ",\"WaterStopDistance\":" + String(water_stop_distance) + ",\"TankHeight\":" + String(tank_height) + ",\"LowWaterLevel\":" + String(water_level_low) + ",\"Unit\":\"CM\"}";
-        Serial.println(temp);
-        char tab2[1024];
-        strncpy(tab2, temp.c_str(), sizeof(tab2));
-        tab2[sizeof(tab2) - 1] = 0;
-        client.publish(topicP, tab2);
 
         if (pump_switch)
         {
             processDryRunProtect(per);
         }
 
-        printPumpStatus();
+        String status = pumpStatus();
+        String temp = "{\"Level\":" + String(per) + ",\"Distance\":" + String(distance) + ",\"PumpStatus\":" + "\"" + String(status) + "\"" + ",\"DryRunWait\":" + String(dry_run_wait) + ",\"MaxRange\":" + String(max_range) + ",\"WaterStopDistance\":" + String(water_stop_distance) + ",\"TankHeight\":" + String(tank_height) + ",\"LowWaterLevel\":" + String(water_level_low) + ",\"Unit\":\"CM\"}";
+        Serial.println(temp);
+        char tab2[1024];
+        strncpy(tab2, temp.c_str(), sizeof(tab2));
+        tab2[sizeof(tab2) - 1] = 0;
+        client.publish(topicP, tab2);
     }
 }
 
